@@ -1,0 +1,76 @@
+img1.png-> en esta captura lo que hago es situarme en la carpeta del entorno de pruebas del servidor lamp. En mi caso ~/Unidad3/CreacionEntornoPruebas una vez en esta ubicación veo el estado del escenario multicontenedor con el comando docker ps y compruebo que esta funcionando todo correctamente
+img2.png-> configuración del fichero en ~/Unidad3/CreacionEntornoPruebas/docker-compose-lamp/config/vhosts/default.conf con el siguiente contenido "<VirtualHost *:80>
+
+    ServerName www.pps.edu
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/html
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+</VirtualHost>"
+img3.png-> recargo apache con el comando docker exec lamp-php84 /bin/bash -c "service apache2 reload"
+img4.png-> aqui edito el fichero /etc/hots y añado "127.0.0.1 pps.edu www.pps.edu"
+img5.png-> Aquí accedo mediante el buscador firefox a la web http://www.pps.edu y sale la web de lamp
+img6.png-> para crear el servidor virtual primero tengo que entrar al contenedor.
+img7.png-> ahora creo una carpeta para el sitio y me muevo a ella con el comando mkdir /var/www/html/hacker cd /hacker
+img8.png-> Creo un archivo llamado index.html con nano y pongo un contenido simple <h1>Servidor Hacker de aguado <3</h1>
+img9.png-> le doy permisos con chown -R www-data:www-data /var/www/html/hacker
+chmod -R 755 /var/www/html/hacker
+img10.png-> Creo el archivo de configuración con el comando nano /etc/apache2/sites-available/hacker.conf y el contenido "<VirtualHost *:80>
+
+    ServerName www.hacker.edu
+
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/html/hacker
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+</VirtualHost>"
+img11.png-> en esta imagen lo que hago es activar el sitio con el comando "a2ensite hacker.conf"
+img12.png-> Reinicio el servicio apache con el comando "service apache2 reload"
+img13.png-> en esta captura se ve como en la máquina kali entro en el archivo de configuración nano /etc/hosts y añado hacker y hacker.edun delante de pps.edu y www.pps.edu
+img14.png-> en esta captura pruebo que en el buscador puedo abrir la web http://www.hacker.edu
+img15.png-> Ahora activo https, para ello primedo accedo al contenedor con el comando "docker exec -it lamp-php84 /bin/bash"
+img16.png-> me muevo a la carpeta SSL
+img17.png-> aquí creo el certificado ssl con el comando "openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout localhost.key -out localhost.crt" y cuando me pregunte Common Name pongo "pps.edu"
+img18.png-> en la máquina kali pongo nano ./config/vhosts/default.conf y de contenido pongo "<VirtualHost *:80>
+
+    ServerName www.pps.edu
+
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/html
+    <Directory /var/www/html>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName www.pps.edu
+
+   #activar uso del motor de protocolo SSL
+    SSLEngine on
+    SSLCertificateFile /etc/apache2/ssl/localhost.crt
+    SSLCertificateKeyFile /etc/apache2/ssl/localhost.key
+
+    DocumentRoot /var/www/html
+</VirtualHost>
+"
+img19.png-> en esta imagen vuelvo al contenedor y activo el módulo ssl con el comando "a2enmod ssl" y reinicio apache con el comando "service apache2 restart"
+img20.png-> Ahora el servidor soportaría HTTPS. Accedemos al servidor en la siguiente dirección: https://www.pps.edu. Hemos activado SSL pero no lo hemos firmado con ninguan entidad de certificación, por lo que nos deja trabajar con SSL pero nos va a dar un aviso de servidor no confiable, por lo que tenemos que darle a Avanzado y Acceder a www.pps.edu (sitio no seguro).
+img21.png-> nada es otra imagen de la web no tiene relevancia
+img22.png-> en esta captura lo que hago es editar ./config/vhosts/default.conf y añado "RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]"
+img23.png-> activo el módulo con el comando "docker exec lamp-php84 /bin/bash -c "a2enmod rewrite"" y reinicio apache "docker exec lamp-php84 /bin/bash -c "service apache2 restart""
+img24.png-> CSP (Content Security Policy) es un mecanismo de seguridad que limita los orígenes de scripts, estilos e imágenes en una aplicación web para evitar ataques como XSS. Para habilitarla añadimos en el fichero de configuración del sitio y lo qu ehago es añadir al fichero "./config/vhosts/default.conf" la siguiente configuración "<IfModule mod_headers.c>
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'  object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+</IfModule>"
+img25.png-> 
