@@ -111,3 +111,88 @@ img32.png-> vuelvo a recargar el servidor de apache con "docker exec lamp-php84 
 img33.png-> Para que no se nos muestre la información de PHP, cambiamos expose_php = On por expose_php = Off en el php.ini
 img34.png-> Cambiamos también para que no se nos muestre la información de apache, ponemos el archivo de configuración de seguridad de apache  /etc/apache2/conf-available/security.conf. Ponemos ServerTokens Full
 img35.png-> Con estas modificaciones, la respuesta del servidor a curl -I http://pps.edu ya no debería mostrar la versión de PHP
+img36.png-> Eliminamos el archivo .htaccess que hemos colocado anteriormente.
+img37.png-> vuelvo al archivo de configuración "/etc/apache2/sites-enabled/default.conf" y pongo la siguiente configuración "<VirtualHost *:80>
+
+    ServerName www.pps.edu
+
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/html
+    <Directory /var/www/html>
+        Options +Indexes 
+        AllowOverride None 
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName www.pps.edu
+
+   #activar uso del motor de protocolo SSL 
+    SSLEngine on
+    SSLCertificateFile /etc/apache2/ssl/localhost.crt
+    SSLCertificateKeyFile /etc/apache2/ssl/localhost.key
+
+    DocumentRoot /var/www/html
+</VirtualHost>"
+img38.png-> Para la prueba, crea una carpeta de ejemplo e introduce en ella dos archivos vacíos: esto lo hago usando los comandos "# desde el contenedor
+mkdir /var/www/html/hacker/ejemplo
+touch /var/www/html/hacker/ejemplo/ejemplo1.txt
+touch /var/www/html/hacker/ejemplo/ejemplo2.txt
+chmod -R www-data:www-data /var/www/htmlhacker//ejemplo
+# si quisieramos hacerlo desde la máquina anfitriona tendríamos que cambiar la ruta a
+# ./www/hacker/ejemplo"
+img39.png-> edito la configuracion del sitio hacker pongo "<Directory /var/www/html/hacker>
+    Options -Indexes +FollowSymLinks
+    AllowOverride None
+    Require all granted
+</Directory>"
+img40.png-> Recargo apache con el comando "service apache2 reload"
+img41.png-> Pruebo en el navegador "http://hacker.edu/ejemplo" y da error como se ve en la captura.
+img42.png-> Cambiuo los permisos del archivo con el comando "chmod 640 /etc/apache2/apache2.conf"
+img43.png-> En el fichero "nano /etc/apache2/sites-enabled/default.conf" añado "<Directory />
+    <LimitExcept GET POST>
+        Deny from all
+    </LimitExcept>
+</Directory>" esto es Para Desactivar métodos HTTP inseguros como PUT, DELETE, TRACE u OPTIONS
+img44.png-> vuelvo a recargar apache con el comando "service apache2 reload"
+img45.png-> Configurar cabeceras de seguridad en Apache
+
+Aplicamos diferentes mejoras que nos proporciona el módulo headers.
+
+Para habilitar el módulo: "a2enmod headers"
+img46.png-> Incluimos en /etc/apache2/defaul.confo en nuestro archivo de sitio virtual /etc/apache2/sites-available/XXXXX.conf: "Header always unset X-Powered-By
+Header always set X-Frame-Options "DENY"
+Header always set X-XSS-Protection "1; mode=block"
+Header always set X-Content-Type-Options "nosniff""
+img47.png-> vuelvo a reiniciar el servidor apache2 "service apache2 reload"
+img48.png-> Para instalar la libreria de Apache ModSecurity ejecuta en línea de comandos "apt update
+apt install libapache2-mod-security2"
+img49.png-> copio el archivo de configuración redomendado con el comando "cp /etc/modsecurity/modsecurity.conf-recommended /etc/modsecurity/modsecurity.conf
+nano /etc/modsecurity/modsecurity.conf"
+img50.png-> en el fichero de configuracion "nano /etc/modsecurity/modsecurity.conf
+" me aseguro de que esté "SecRuleEngine DetectionOnly" como se ve a continuación.
+img51.png-> Vuelvo a guardar y reiniciar el servidor de Apache con el comando "service apache2 reload"
+img52.png-> verifico que mod_security esté cargado con el comando "apachectl -M | grep security" y me aseguro de que pone "security2_module (shared)" tal cual se ve en la imágenes
+img53.png-> Para incorporar las reglas CRS de OWASP a mod_security clonamos el repositorio y copiamos el archivo de configuración. "cd /etc/modsecurity
+apt install git
+git clone https://github.com/coreruleset/coreruleset.git
+cd coreruleset
+cp crs-setup.conf.example crs-setup.conf"
+img54.png-> Para comprobar si están añadidas las reglas de modsecurity-crs, ejecutp "apache2ctl -t -D DUMP_INCLUDES|grep modsecurity"
+img55.png-> creo el archivo "nano /etc/apache2/conf-available/security-crs.conf" y añado "# Activar CRS
+IncludeOptional /etc/modsecurity/coreruleset/crs-setup.conf
+IncludeOptional /etc/modsecurity/coreruleset/rules/*.conf"
+img56.png-> Luego, habilita el archivo de configuración y reinicia el servicio con los comandos "a2enconf security-crs
+service apache2 reload"
+img57.png-> Prueba reglas usando cadenas típicas de ataques en la URL: "https://pps.edu/lfi.php?file=../../../../etc/passwd" El acceso da bloqueado como se ve en la imágen
+img58.png-> veo los logs de modSecurity con "cat /var/log/apache2/modsec_audit.log" 
+img59-> empiezo a dejarlo todo niquelao con "apt remove --purge  libapache2-mod-security2
+rm -rf /etc/modsecurity"
+img60.png-> Volvemos a colocar los archivos por defecto "apache2ctl -t -D DUMP_INCLUDES|grep modsecurity
+"
+img61.png-> Volvemos a colocar los archivos por defecto "/etc/apache2/apache2.conf" y "/usr/local/etc/php/php.ini"
